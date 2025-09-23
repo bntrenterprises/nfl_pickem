@@ -1,0 +1,81 @@
+<!-- templates/week.html -->
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>NFL Pick'Em – Week {{ week }}</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 0; }
+      header {
+        position: fixed; top: 0; left: 0; right: 0;
+        text-align: center; background: #003366; color: white;
+        padding: 20px; font-size: 24px; z-index: 10;
+      }
+      .container { margin-top: 80px; padding: 20px; max-width: 900px; margin-left: auto; margin-right: auto; }
+      .nav { margin-bottom: 16px; }
+      a.btn {
+        display: inline-block; padding: 8px 12px; background: #e6eef9;
+        border: 1px solid #b6c8e6; border-radius: 6px; text-decoration: none; color: #003366;
+      }
+      .game { border: 1px solid #ddd; border-radius: 8px; padding: 14px; margin-bottom: 12px; background: #fafafa; }
+      .teams { display: flex; gap: 18px; align-items: center; margin-top: 8px; }
+      .save { margin-top: 16px; padding: 10px 16px; }
+      .userbar { position:absolute; right:16px; top:22px; font-size:14px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      NFL Pick'Em 2025/2026 Season
+      <div class="userbar">
+        Logged in as <strong>{{ user.capitalize() }}</strong> · <a style="color:#fff;" href="{{ url_for('logout') }}">Logout</a>
+      </div>
+    </header>
+
+    <div class="container">
+      <div class="nav">
+        <a class="btn" href="{{ url_for('dashboard') }}">← Back to Weeks</a>
+      </div>
+
+      <h2>Week {{ week }} – Make Your Picks</h2>
+
+      {% if games|length == 0 %}
+        <p>No games loaded for this week yet.</p>
+      {% else %}
+        <form method="post">
+          {% for g in games %}
+            <div class="game">
+              <div>
+                <strong>Game {{ loop.index }}:</strong> {{ g.away }} @ {{ g.home }}
+                {% if g.kickoff_fmt %}
+  <div style="font-size:12px; color:#555;">Kickoff: {{ g.kickoff_fmt }}</div>
+{% endif %}
+
+                {% if g.note %}
+                  <div style="font-size:12px; color:#555;">{{ g.note }}</div>
+                {% endif %}
+              </div>
+              <div class="teams">
+                <label>
+                  <input type="radio" name="pick_{{ g.id }}" value="{{ g.away }}"
+                         {% if existing.get(g.id) == g.away %}checked{% endif %}>
+                  {{ g.away }}
+                </label>
+                <label>
+                  <input type="radio" name="pick_{{ g.id }}" value="{{ g.home }}"
+                         {% if existing.get(g.id) == g.home %}checked{% endif %}>
+                  {{ g.home }}
+                </label>
+                {% if existing.get(g.id) %}
+                  <span style="margin-left:auto; font-size:12px; color:#555;">
+                    Saved: {{ existing.get(g.id) }}
+                  </span>
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
+          <button class="save" type="submit">Save Picks</button>
+        </form>
+      {% endif %}
+    </div>
+  </body>
+</html>

@@ -1,0 +1,5 @@
+Flask==3.0.3
+gunicorn==21.2.0
+requests==2.32.3
+beautifulsoup4==4.12.3
+tzdata==2025.2

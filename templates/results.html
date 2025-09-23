@@ -1,0 +1,56 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Set Winners – Week {{ week }}</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 20px; }
+      h1 { margin-bottom: 6px; }
+      a.btn { display:inline-block; padding:8px 12px; background:#e6eef9; border:1px solid #b6c8e6; border-radius:6px; text-decoration:none; color:#003366; }
+      .game { border:1px solid #ddd; border-radius:8px; padding:12px; margin:10px 0; background:#fafafa; }
+      .row { display:flex; gap:18px; align-items:center; margin-top:8px; }
+      .save { margin-top:14px; padding:10px 16px; }
+      .note { font-size:12px; color:#555; margin-top:4px; }
+    </style>
+  </head>
+  <body>
+    <div style="margin-bottom:10px;">
+      <a class="btn" href="{{ url_for('dashboard') }}">← Back to Dashboard</a>
+    </div>
+
+    <h1>Set Winners – Week {{ week }}</h1>
+    <form method="post">
+      {% if games|length == 0 %}
+        <p>No games for this week.</p>
+      {% else %}
+        {% for g in games %}
+          <div class="game">
+            <div><strong>Game {{ loop.index }}:</strong> {{ g.away }} @ {{ g.home }}</div>
+            <div class="note">
+              {% if g.kickoff_fmt %}Kickoff: {{ g.kickoff_fmt }}{% elif g.kickoff_local %}Kickoff: {{ g.kickoff_local }}{% endif %}
+              {% if g.note %} · {{ g.note }}{% endif %}
+            </div>
+            <div class="row">
+              <label>
+                <input type="radio" name="win_{{ g.id }}" value="{{ g.away }}"
+                       {% if winners.get(g.id) == g.away %}checked{% endif %}>
+                {{ g.away }}
+              </label>
+              <label>
+                <input type="radio" name="win_{{ g.id }}" value="{{ g.home }}"
+                       {% if winners.get(g.id) == g.home %}checked{% endif %}>
+                {{ g.home }}
+              </label>
+              {% if winners.get(g.id) %}
+                <span style="margin-left:auto; font-size:12px; color:#555;">
+                  Saved winner: {{ winners.get(g.id) }}
+                </span>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+        <button class="save" type="submit">Save Winners</button>
+      {% endif %}
+    </form>
+  </body>
+</html>

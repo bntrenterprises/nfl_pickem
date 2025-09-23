@@ -1,0 +1,84 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>NFL Pick'Em 2025/2026 Season – Dashboard</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 0; }
+      header {
+        position: fixed; top: 0; left: 0; right: 0;
+        text-align: center; background: #003366; color: white;
+        padding: 20px; font-size: 24px; z-index: 10;
+      }
+      .topbar { position: absolute; right: 16px; top: 22px; font-size: 14px; }
+      .container { display: flex; margin-top: 80px; }
+      .main { flex: 2; padding: 20px; }
+      .sidebar { flex: 1; background: #f0f0f0; padding: 20px; border-left: 2px solid #ccc; }
+      h2 { margin-top: 0; }
+      .section { margin-top: 22px; }
+      .weeks { display: flex; flex-wrap: wrap; gap: 10px; }
+      .week-btn {
+        display: inline-block; padding: 10px 16px; text-decoration: none;
+        background: #e6eef9; border: 1px solid #b6c8e6; border-radius: 6px; color: #003366;
+      }
+      .logout { color: #fff; }
+      .card {
+        border: 1px solid #ddd; border-radius: 8px; background: #fafafa;
+        padding: 12px; margin-bottom: 16px;
+      }
+      .muted { color: #666; font-size: 14px; }
+      .record-line { font-size: 18px; margin-top: 6px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      NFL Pick'Em 2025/2026 Season
+      <span class="topbar">
+        Logged in as <strong>{{ user.capitalize() }}</strong> ·
+        <a class="logout" href="{{ url_for('logout') }}">Logout</a>
+      </span>
+    </header>
+
+    <div class="container">
+      <div class="main">
+        <!-- Live Weekly Record (show both users) -->
+        <div class="card">
+          <h2>Live Weekly Record</h2>
+          {% if week_with_results and weekly_records %}
+            <div class="muted">Week {{ week_with_results }}</div>
+            <div class="record-line">Tim: {{ weekly_records.tim.wins }}–{{ weekly_records.tim.losses }}</div>
+            <div class="record-line">Zak: {{ weekly_records.zak.wins }}–{{ weekly_records.zak.losses }}</div>
+          {% else %}
+            <div class="muted">No results posted yet.</div>
+          {% endif %}
+        </div>
+
+        <!-- Picks section -->
+        <h2>Select a Week (Picks)</h2>
+        <div class="weeks">
+          {% for w in weeks %}
+            <a class="week-btn" href="{{ url_for('week_view', week_num=w) }}">Week {{ w }}</a>
+          {% endfor %}
+        </div>
+
+        <!-- Results section (only for Zak, as before) -->
+        {% if user == 'zak' %}
+          <div class="section">
+            <h2>Results</h2>
+            <div class="weeks">
+              {% for w in weeks %}
+                <a class="week-btn" href="{{ url_for('results_week', week_num=w) }}">Week {{ w }}</a>
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="sidebar">
+        <h2>Season Records</h2>
+        <div>Tim: {{ records.tim.wins }}–{{ records.tim.losses }}</div>
+        <div>Zak: {{ records.zak.wins }}–{{ records.zak.losses }}</div>
+      </div>
+    </div>
+  </body>
+</html>
