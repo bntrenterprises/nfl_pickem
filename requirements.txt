@@ -4,5 +4,4 @@ requests==2.32.3
 beautifulsoup4==4.12.3
 tzdata==2025.2
 python-dotenv==1.0.1
-psycopg[binary]==3.2.1
-Flask-SQLAlchemy==3.0.5
+psycopg[binary]==3.2.10
