@@ -5,29 +5,71 @@
     <title>NFL Pick'Em 2025/2026 Season – Dashboard</title>
     <style>
       body { font-family: Arial, sans-serif; margin: 0; }
+
+      /* header font 24px -> 12px */
       header {
         position: fixed; top: 0; left: 0; right: 0;
         text-align: center; background: #003366; color: white;
-        padding: 20px; font-size: 24px; z-index: 10;
+        padding: 10px; font-size: 12px; z-index: 10; /* 50% */
       }
-      .topbar { position: absolute; right: 16px; top: 22px; font-size: 14px; }
+      /* topbar 14px -> 7px */
+      .topbar { position: absolute; right: 16px; top: 10px; font-size: 7px; } /* 50% */
+
       .container { display: flex; margin-top: 80px; }
-      .main { flex: 2; padding: 20px; }
-      .sidebar { flex: 1; background: #f0f0f0; padding: 20px; border-left: 2px solid #ccc; }
+      .main { flex: 2; padding: 10px; }      /* 50% padding */
+      .sidebar { flex: 1; background: #f0f0f0; padding: 10px; border-left: 2px solid #ccc; }
+
       h2 { margin-top: 0; }
-      .section { margin-top: 22px; }
-      .weeks { display: flex; flex-wrap: wrap; gap: 10px; }
+
+      .section { margin-top: 11px; }          /* 50% */
+      .weeks { display: flex; flex-wrap: wrap; gap: 5px; } /* 50% gap */
+
+      /* week buttons padding 10x16 -> 5x8; font halves via 12px */
       .week-btn {
-        display: inline-block; padding: 10px 16px; text-decoration: none;
+        display: inline-block; padding: 5px 8px; text-decoration: none;
         background: #e6eef9; border: 1px solid #b6c8e6; border-radius: 6px; color: #003366;
+        font-size: 12px; /* ~50% of typical 24px headings; readable */
       }
+
       .logout { color: #fff; }
+
+      /* card padding 12 -> 6; margin-bottom 16 -> 8 */
       .card {
         border: 1px solid #ddd; border-radius: 8px; background: #fafafa;
-        padding: 12px; margin-bottom: 16px;
+        padding: 6px; margin-bottom: 8px;
       }
-      .muted { color: #666; font-size: 14px; }
-      .record-line { font-size: 18px; margin-top: 6px; }
+
+      /* muted 14 -> 7; record-line 18 -> 9 */
+      .muted { color: #666; font-size: 7px; }
+      .record-line { font-size: 9px; margin-top: 3px; }
+
+      /* === Picks (2-column) — halve paddings & text === */
+      .picks-grid {
+        display: grid;
+        grid-template-columns: 1fr auto; /* Col 1: Game & Time, Col 2: Pick */
+        gap: 4px 6px;                     /* 50% */
+        background: #fff;
+        border: 1px solid #e5e5e5;
+        border-radius: 8px;
+        margin-top: 6px;                  /* 50% */
+        font-size: 12px;                  /* shrink text inside grid */
+      }
+      .picks-head {
+        font-weight: 700;
+        padding: 4px 5px;                 /* 50% */
+        background: #f6f8ff;
+        border-bottom: 1px solid #e5e5e5;
+      }
+      .picks-cell {
+        padding: 4px 5px;                 /* 50% */
+        border-bottom: 1px solid #eee;
+      }
+      .picks-cell.pick { text-align: right; white-space: nowrap; }
+      .picks-row-last .picks-cell { border-bottom: none; }
+      .picks-game { font-weight: 600; }
+      .picks-time { font-size: 6px; color: #555; margin-top: 2px; } /* 50% */
+      .picks-choice { font-weight: 700; }
+      .picks-empty { color: #777; font-style: italic; }
     </style>
   </head>
   <body>
@@ -78,6 +120,39 @@
         <h2>Season Records</h2>
         <div>Tim: {{ records.tim.wins }}–{{ records.tim.losses }}</div>
         <div>Zak: {{ records.zak.wins }}–{{ records.zak.losses }}</div>
+
+        {% if other_user and other_games and featured_week %}
+          <div class="card">
+            <h2>{{ other_user|capitalize }}’s Picks</h2>
+            <div class="muted">Week {{ featured_week }}</div>
+
+            <!-- TWO-COLUMN PICKS GRID (reduced sizes) -->
+            <div class="picks-grid">
+              <!-- Header row -->
+              <div class="picks-head">Game &amp; Time</div>
+              <div class="picks-head" style="text-align:right;">Pick</div>
+
+              <!-- Data rows -->
+              {% for g in other_games %}
+                {% set is_last = loop.last %}
+                <div class="picks-cell game{% if is_last %} picks-row-last{% endif %}">
+                  <div class="picks-game">{{ g.away }} @ {{ g.home }}</div>
+                  {% if g.kickoff_fmt %}
+                    <div class="picks-time">Kickoff: {{ g.kickoff_fmt }}</div>
+                  {% endif %}
+                </div>
+                <div class="picks-cell pick{% if is_last %} picks-row-last{% endif %}">
+                  {% if other_existing.get(g.id) %}
+                    <span class="picks-choice">{{ other_existing.get(g.id) }}</span>
+                  {% else %}
+                    <span class="picks-empty">— no pick yet —</span>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            </div>
+            <!-- /TWO-COLUMN PICKS GRID -->
+          </div>
+        {% endif %}
       </div>
     </div>
   </body>

@@ -8,6 +8,34 @@ import os
 import json
 import psycopg
 
+# --- Time/lock helpers (NEW) ---
+from datetime import timedelta
+from zoneinfo import ZoneInfo  # stdlib (Python 3.11+)
+
+CENTRAL = ZoneInfo("America/Chicago")
+UTC = ZoneInfo("UTC")
+
+def to_utc(dt: datetime) -> datetime:
+    """Normalize any datetime to UTC. If naive, assume Central."""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=CENTRAL)
+    return dt.astimezone(UTC)
+
+def compute_lock_flags(kickoff_local_str: str):
+    """
+    Returns {'is_locked': bool, 'lock_fmt': str}
+    Lock time = kickoff + 10 minutes (UTC-safe).
+    """
+    try:
+        dt = datetime.fromisoformat(kickoff_local_str)
+        kickoff_utc = to_utc(dt)
+        lock_utc = kickoff_utc + timedelta(minutes=10)
+        is_locked = datetime.now(UTC) >= lock_utc
+        lock_fmt = lock_utc.astimezone(CENTRAL).strftime("%a, %b %d • %I:%M %p")
+        return {"is_locked": is_locked, "lock_fmt": lock_fmt}
+    except Exception:
+        return {"is_locked": False, "lock_fmt": ""}
+
 app = Flask(__name__)
 app.secret_key = "change-me-in-production"  # needed for sessions
 
@@ -186,7 +214,7 @@ def compute_season_records():
 # ----- Formatting helpers -----
 def prettify_games(games):
     """
-    Add g['kickoff_fmt'] formatted as 'Sun, Sep 07 • 12:00 PM' (12-hour).
+    Add g['kickoff_fmt'] formatted as 'Sun, Sep 07 • %I:%M %p' (12-hour).
     If kickoff_local isn't ISO, fallback to the raw string.
     """
     pretty = []
@@ -203,6 +231,24 @@ def prettify_games(games):
         ng["kickoff_fmt"] = nice
         pretty.append(ng)
     return pretty
+
+# --- NEW: helper to decide which week's picks to show on dashboard ---
+def choose_featured_week(weeks: list[int]) -> int | None:
+    """
+    Prefer the earliest week that has any game not yet locked.
+    If all are locked (or empty), fall back to the latest week that has games.
+    """
+    wks = sorted(weeks)
+    for w in wks:
+        games = get_games_for_week(w)
+        if not games:
+            continue
+        if any(not compute_lock_flags(g.get("kickoff_local", "")).get("is_locked", False) for g in games):
+            return w
+    for w in reversed(wks):
+        if get_games_for_week(w):
+            return w
+    return wks[-1] if wks else None
 
 # ----- Auth helper -----
 def login_required(view_func):
@@ -256,6 +302,17 @@ def dashboard():
         }
 
     records = compute_season_records()
+
+    # --- NEW: prepare other user's picks for sidebar ---
+    other_user = next((u for u in USERS.keys() if u != user), None)
+    featured_week = choose_featured_week(weeks)
+    other_existing = {}
+    other_games = []
+    if other_user and featured_week:
+        other_existing = get_user_picks_for_week(other_user, featured_week)
+        raw = get_games_for_week(featured_week)
+        other_games = prettify_games(raw)
+
     return render_template(
         "dashboard.html",
         user=user,
@@ -263,6 +320,11 @@ def dashboard():
         records=records,
         week_with_results=week_with_results,
         weekly_records=weekly_records,
+        # NEW (for sidebar picks)
+        other_user=other_user,
+        featured_week=featured_week,
+        other_games=other_games,
+        other_existing=other_existing,
     )
 
 @app.route("/week/<int:week_num>", methods=["GET", "POST"])
@@ -272,20 +334,45 @@ def week_view(week_num):
     raw_games = get_games_for_week(week_num)
     games = prettify_games(raw_games)
 
+    # lock flags (attach to games for template)
+    lock_map = {}
+    for i, g in enumerate(raw_games):
+        flags = compute_lock_flags(g.get("kickoff_local", ""))
+        lock_map[g["id"]] = flags["is_locked"]
+        if i < len(games):
+            games[i]["is_locked"] = flags["is_locked"]
+            games[i]["lock_fmt"] = flags["lock_fmt"]
+
     if request.method == "POST":
         # gather picks from the form and upsert them
         picks_to_save = {}
         for g in raw_games:
-            pick_key = f"pick_{g['id']}"
+            gid = g["id"]
+            # skip locked games on server-side
+            if lock_map.get(gid, False):
+                continue
+            pick_key = f"pick_{gid}"
             chosen = request.form.get(pick_key)
             if chosen:
-                picks_to_save[g["id"]] = chosen
-        save_picks(user, week_num, picks_to_save)
+                picks_to_save[gid] = chosen
+        if picks_to_save:
+            save_picks(user, week_num, picks_to_save)
+        else:
+            print(f"[LOCK] All submitted games for week {week_num} were locked or empty for user={user}.")
         return redirect(url_for("week_view", week_num=week_num))
 
+    # existing picks for the logged-in user
     existing = get_user_picks_for_week(user, week_num)
+
+    # NOTE: we are NOT passing other user's picks to the week page anymore
     print(f"[WEEK] {week_num} games loaded:", len(games))
-    return render_template("week.html", user=user, week=week_num, games=games, existing=existing)
+    return render_template(
+        "week.html",
+        user=user,
+        week=week_num,
+        games=games,
+        existing=existing,
+    )
 
 # ----- Admin: set winners for a week -----
 @app.route("/admin/results/<int:week_num>", methods=["GET", "POST"])

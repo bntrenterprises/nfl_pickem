@@ -21,6 +21,13 @@
       .teams { display: flex; gap: 18px; align-items: center; margin-top: 8px; }
       .save { margin-top: 16px; padding: 10px 16px; }
       .userbar { position:absolute; right:16px; top:22px; font-size:14px; }
+
+      /* Lock styles */
+      .lock-pill { display:inline-block; font-size:12px; padding:2px 8px; border-radius:999px; background:#eef3ff; color:#1c2a4d; margin-left:6px; }
+      .lock-pill.locked { background:#ffd9d9; color:#7a0000; font-weight:600; }
+      .muted { font-size:12px; color:#555; }
+      .spacer { flex:1; }
+      .locked-row { opacity:.8; }
     </style>
   </head>
   <body>
@@ -43,32 +50,44 @@
       {% else %}
         <form method="post">
           {% for g in games %}
-            <div class="game">
+            {% set locked = g.is_locked %}
+            <div class="game{% if locked %} locked-row{% endif %}">
               <div>
                 <strong>Game {{ loop.index }}:</strong> {{ g.away }} @ {{ g.home }}
+
                 {% if g.kickoff_fmt %}
-  <div style="font-size:12px; color:#555;">Kickoff: {{ g.kickoff_fmt }}</div>
-{% endif %}
+                  <div class="muted">
+                    Kickoff: {{ g.kickoff_fmt }}
+                    {% if g.lock_fmt %}
+                      <span class="lock-pill {% if locked %}locked{% endif %}">
+                        {% if locked %}Locked{% else %}Locks{% endif %} at {{ g.lock_fmt }}
+                      </span>
+                    {% endif %}
+                  </div>
+                {% endif %}
 
                 {% if g.note %}
-                  <div style="font-size:12px; color:#555;">{{ g.note }}</div>
+                  <div class="muted">{{ g.note }}</div>
                 {% endif %}
               </div>
+
               <div class="teams">
                 <label>
                   <input type="radio" name="pick_{{ g.id }}" value="{{ g.away }}"
-                         {% if existing.get(g.id) == g.away %}checked{% endif %}>
+                         {% if existing.get(g.id) == g.away %}checked{% endif %}
+                         {% if locked %}disabled{% endif %}>
                   {{ g.away }}
                 </label>
                 <label>
                   <input type="radio" name="pick_{{ g.id }}" value="{{ g.home }}"
-                         {% if existing.get(g.id) == g.home %}checked{% endif %}>
+                         {% if existing.get(g.id) == g.home %}checked{% endif %}
+                         {% if locked %}disabled{% endif %}>
                   {{ g.home }}
                 </label>
+
                 {% if existing.get(g.id) %}
-                  <span style="margin-left:auto; font-size:12px; color:#555;">
-                    Saved: {{ existing.get(g.id) }}
-                  </span>
+                  <span class="spacer"></span>
+                  <span class="muted">Saved: {{ existing.get(g.id) }}</span>
                 {% endif %}
               </div>
             </div>
