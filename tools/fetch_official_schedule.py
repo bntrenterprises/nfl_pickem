@@ -67,7 +67,7 @@ def parse_time_et_to_ct(date_ymd, et_text: str):
     hm = et_text.strip().lower()
     m = re.match(r"^(\d{1,2}):(\d{2})([ap])$", hm)
     if not m:
-        # Sometimes ESPN-style '8:15p' vs '8:15 pm'; we'll try a forgiving parse:
+        # Tolerant parse for '8:15 pm' vs '8:15p'
         hm = re.sub(r"\s+", "", hm.replace("pm", "p").replace("am", "a"))
         m = re.match(r"^(\d{1,2}):(\d{2})([ap])$", hm)
         if not m:
@@ -96,11 +96,16 @@ def build_schedule():
     lines = fetch_lines()
 
     week_re = re.compile(r"^WEEK\s+(\d+)$", re.I)
-    date_re = re.compile(r"^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s+[A-Za-z]+\.?\s+\d{1,2},\s+2025$", re.I)
+    # Allow Week 18 spillover into January 2026.
+    date_re = re.compile(
+        r"^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s+[A-Za-z]+\.?\s+\d{1,2},\s+(2025|2026)$",
+        re.I
+    )
     # Matchups like:
     #  'Dallas Cowboys at Philadelphia Eagles'
     #  'Kansas City Chiefs vs Los Angeles Chargers (Sao Paulo)'
     game_re = re.compile(r"^(.+?)\s+(at|vs)\s+(.+?)(?:\s+\(([^)]+)\))?$", re.I)
+
     # Time lines:
     #   '8:20p (ET)'  (we ignore this; we want the next bare ET time)
     time_with_zone_re = re.compile(r"^\d{1,2}:\d{2}[ap]\s+\([A-Z]{2,4}\)$")
@@ -113,10 +118,28 @@ def build_schedule():
     pending_game = None
     game_counter = {}
 
+    def flush_pending():
+        # If we saw a matchup but never got a time (e.g., TBD),
+        # write it with empty kickoff so it still shows up.
+        nonlocal pending_game, current_week, game_counter
+        if pending_game and current_week:
+            game_counter[current_week] += 1
+            gid = f"W{current_week}G{game_counter[current_week]}"
+            weeks[str(current_week)].append({
+                "id": gid,
+                "away": pending_game["away"],
+                "home": pending_game["home"],
+                "kickoff_local": "",  # unknown/TBD
+                "note": pending_game["note"],
+            })
+            pending_game = None
+
     for ln in lines:
         # Detect week
         m = week_re.match(ln)
         if m:
+            # New week: flush any dangling game from prior context
+            flush_pending()
             current_week = int(m.group(1))
             weeks[str(current_week)] = []
             game_counter[current_week] = 0
@@ -126,6 +149,8 @@ def build_schedule():
 
         # Detect date
         if date_re.match(ln):
+            # New date: flush any dangling game before switching date
+            flush_pending()
             nd = normalize_date_line(ln)
             if nd:
                 current_date = nd
@@ -134,6 +159,8 @@ def build_schedule():
         # Detect game row
         gm = game_re.match(ln)
         if gm and current_week:
+            # Starting a new game row: if a prior game never got a time, flush it
+            flush_pending()
             away = gm.group(1).strip()
             sep = gm.group(2).lower()
             home = gm.group(3).strip()
@@ -167,6 +194,8 @@ def build_schedule():
                 })
                 pending_game = None  # clear for next game
 
+    # End of file: flush any last dangling game (TBD time)
+    flush_pending()
     return {"year": 2025, "weeks": weeks}
 
 def main():
@@ -177,6 +206,9 @@ def main():
     # Quick sanity:
     total = sum(len(v) for v in data["weeks"].values())
     print(f"Weeks: {len(data['weeks'])} | Games: {total}")
+    empty_weeks = [w for (w, gs) in data["weeks"].items() if not gs]
+    if empty_weeks:
+        print(f"WARNING: No games parsed for weeks: {', '.join(sorted(empty_weeks, key=int))}")
 
 if __name__ == "__main__":
     main()
